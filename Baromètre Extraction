@@ -1,0 +1,101 @@
+import re
+import sys
+import pdfplumber
+
+def extract_info(text, patterns, postprocess=lambda x: x):
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+        if match:
+            return postprocess(match.group(1))
+    return "Non trouvé"
+
+def main(pdf_path):
+    with pdfplumber.open(pdf_path) as pdf:
+        text = "\n".join(page.extract_text() or '' for page in pdf.pages)
+
+    data = {}
+
+    data["Nombre de salariés en France"] = extract_info(
+        text,
+        [r"salarié[s]?\s+(?:en\s+France|France)\s*[:\-–]?\s*([\d\s]+)"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Nombre de salariés monde"] = extract_info(
+        text,
+        [r"salarié[s]?\s+(?:dans le monde|monde)\s*[:\-–]?\s*([\d\s]+)",
+         r"effectif total\s*[:\-–]?\s*([\d\s]+)"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Montant de la prime de participation"] = extract_info(
+        text,
+        [r"prime de participation[^€\d]*([\d\s]+)\s*€",
+         r"participation[^€\d]*([\d\s]+)\s*€"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Montant de la prime d'intéressement"] = extract_info(
+        text,
+        [r"prime d['’]intéressement[^€\d]*([\d\s]+)\s*€",
+         r"intéressement[^€\d]*([\d\s]+)\s*€"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Montant de la prime de participation et d'intéressement"] = extract_info(
+        text,
+        [r"participation et d['’]intéressement[^€\d]*([\d\s]+)\s*€"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Nombre de bénéficiaires de ces accords"] = extract_info(
+        text,
+        [r"nombre de bénéficiaires[^:\d]*[:\-–]?\s*([\d\s]+)"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Montant de la prime d'abondement"] = extract_info(
+        text,
+        [r"prime d['’]abondement[^€\d]*([\d\s]+)\s*€",
+         r"abondement[^€\d]*([\d\s]+)\s*€"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Chiffre d'affaires en France"] = extract_info(
+        text,
+        [r"chiffre d['’]affaires\s+(?:en\s+France|France)[^€\d]*([\d\s]+)\s*[€MmKk]",
+         r"ventes\s+(?:en\s+France|France)[^€\d]*([\d\s]+)\s*[€MmKk]"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Chiffre d'affaires monde"] = extract_info(
+        text,
+        [r"chiffre d['’]affaires\s+(?:consolidé|monde|total)[^€\d]*([\d\s]+)\s*[€MmKk]",
+         r"ventes\s+monde[^€\d]*([\d\s]+)\s*[€MmKk]"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Nombre d'actions émises"] = extract_info(
+        text,
+        [r"nombre d['’]actions émises[^:\d]*[:\-–]?\s*([\d\s]+)",
+         r"actions en circulation[^:\d]*[:\-–]?\s*([\d\s]+)"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Montant de dividendes versés"] = extract_info(
+        text,
+        [r"dividende[s]? vers[ée]s?[^€\d]*([\d\s]+)\s*€",
+         r"montant total des dividendes[^€\d]*([\d\s]+)\s*€"],
+        lambda x: x.replace(" ", "")
+    )
+    data["Résultat net"] = extract_info(
+        text,
+        [r"résultat net[^€\d]*([\d\s]+)\s*[€MmKk]",
+         r"bénéfice net[^€\d]*([\d\s]+)\s*[€MmKk]"],
+        lambda x: x.replace(" ", "")
+    )
+    data["EBITDA"] = extract_info(
+        text,
+        [r"ebitda[^€\d]*([\d\s]+)\s*[€MmKk]"],
+        lambda x: x.replace(" ", "")
+    )
+
+    print("Résultats trouvés :")
+    for k, v in data.items():
+        print(f"{k} : {v}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage : python extract_ur_infos.py chemin/vers/document.pdf")
+        sys.exit(1)
+    main(sys.argv[1])
