@@ -1,0 +1,36 @@
+import pdfplumber
+import re
+
+def extract_info(pdf_path):
+    results = {
+        'chiffre_affaires': None,
+        'nombre_salaries': None,
+        'EBITDA': None
+    }
+    with pdfplumber.open(pdf_path) as pdf:
+        text = ''
+        for page in pdf.pages:
+            text += page.extract_text() + '\n'
+    
+    # Expressions régulières pour trouver les informations (à adapter selon la langue et la présentation du document)
+    # Chiffre d'affaires
+    ca_match = re.search(r"[Cc]hiffre d'affaires[\s:]*([\d\s.,]+) *[Mmd€]", text)
+    if ca_match:
+        results['chiffre_affaires'] = ca_match.group(1).replace(' ', '')
+
+    # Nombre de salariés
+    sal_match = re.search(r"[Nn]ombre de salariés[\s:]*([\d\s]+)", text)
+    if sal_match:
+        results['nombre_salaries'] = sal_match.group(1).replace(' ', '')
+
+    # EBITDA
+    ebitda_match = re.search(r"EBITDA[\s:]*([\d\s.,]+) *[Mmd€]", text)
+    if ebitda_match:
+        results['EBITDA'] = ebitda_match.group(1).replace(' ', '')
+
+    return results
+
+if __name__ == "__main__":
+    pdf_path = "ton_document.pdf"
+    info = extract_info(pdf_path)
+    print(info)
