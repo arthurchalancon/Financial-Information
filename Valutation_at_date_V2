@@ -1,0 +1,91 @@
+import yfinance as yf
+import pandas as pd
+
+TICKERS = ["AAPL", "MSFT", "GOOGL", "AIR.PA"]
+
+def get_latest_price_and_date(ticker):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="5d")  # 5 derniers jours de marché
+    if hist.empty:
+        return None, None
+    last_row = hist.iloc[-1]
+    return last_row["Close"], hist.index[-1].strftime("%Y-%m-%d")
+
+def get_shares_outstanding(ticker):
+    stock = yf.Ticker(ticker)
+    return stock.info.get("sharesOutstanding", None)
+
+def get_ttm_sum(df, col):
+    if df.empty or col not in df.index:
+        return None
+    cols_sorted = sorted(df.columns, reverse=True)
+    selected = cols_sorted[:4]
+    if len(selected) < 4:
+        return None
+    return df.loc[col, selected].sum()
+
+def get_last_quarter_value(df, col):
+    if df.empty or col not in df.index:
+        return None
+    latest_col = sorted(df.columns, reverse=True)[0]
+    return df.loc[col, latest_col]
+
+def extract_valuation(ticker):
+    stock = yf.Ticker(ticker)
+    close_price, actual_date = get_latest_price_and_date(ticker)
+    shares = get_shares_outstanding(ticker)
+    market_cap = close_price * shares if close_price and shares else None
+
+    qf = stock.quarterly_financials
+    ebitda_ttm = get_ttm_sum(qf, "Ebitda")
+    net_income_ttm = get_ttm_sum(qf, "Net Income")
+    revenue_ttm = get_ttm_sum(qf, "Total Revenue")
+
+    eps_ttm = (net_income_ttm / shares) if shares and net_income_ttm else None
+    trailing_pe = (close_price / eps_ttm) if close_price and eps_ttm and eps_ttm != 0 else None
+    price_to_sales = (market_cap / revenue_ttm) if market_cap and revenue_ttm else None
+
+    qbs = stock.quarterly_balance_sheet
+    equity = get_last_quarter_value(qbs, "Total Stockholder Equity")
+    price_to_book = (market_cap / equity) if market_cap and equity else None
+
+    debt = get_last_quarter_value(qbs, "Long Term Debt") or 0
+    cash = get_last_quarter_value(qbs, "Cash") or 0
+    enterprise_value = (market_cap + debt - cash) if market_cap is not None else None
+
+    ev_to_revenue = (enterprise_value / revenue_ttm) if enterprise_value and revenue_ttm else None
+    ev_to_ebitda = (enterprise_value / ebitda_ttm) if enterprise_value and ebitda_ttm else None
+
+    result = {
+        "Ticker": ticker,
+        "Date données": actual_date,
+        "Market Cap": market_cap,
+        "Enterprise Value": enterprise_value,
+        "Trailing P/E": trailing_pe,
+        "Forward P/E": "Non disponible",
+        "PEG Ratio (5yr expected)": "Non disponible",
+        "Price/Sales": price_to_sales,
+        "Price/Book": price_to_book,
+        "Enterprise Value/Revenue": ev_to_revenue,
+        "Enterprise Value/EBITDA": ev_to_ebitda,
+        "Cours de l'action": close_price,
+        "Shares Outstanding": shares,
+    }
+    return result
+
+def main():
+    results = []
+    for ticker in TICKERS:
+        print(f"Extraction pour {ticker}...")
+        try:
+            data = extract_valuation(ticker)
+            results.append(data)
+        except Exception as e:
+            print(f"Erreur pour {ticker}: {e}")
+    df = pd.DataFrame(results)
+    print(df)
+    df.to_excel("valuation_latest.xlsx", index=False)
+    print("\nFichier Excel généré: valuation_latest.xlsx")
+
+if __name__ == "__main__":
+    main()
