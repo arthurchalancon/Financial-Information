@@ -1,0 +1,57 @@
+import yfinance as yf
+import pandas as pd
+import time
+
+# Récupère la liste des tickers du S&P500 depuis Wikipedia
+url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+sp500_df = pd.read_html(url)[0]
+tickers = sp500_df['Symbol'].tolist()
+tickers = [t.replace('.', '-') for t in tickers]
+
+RATIO_FIELDS = [
+    ("Market Cap", "marketCap"),
+    ("Enterprise Value", "enterpriseValue"),
+    ("Trailing P/E", "trailingPE"),
+    ("Forward P/E", "forwardPE"),
+    ("PEG Ratio (5yr expected)", "pegRatio"),
+    ("Price/Sales", "priceToSalesTrailing12Months"),
+    ("Price/Book", "priceToBook"),
+    ("Enterprise Value/Revenue", "enterpriseToRevenue"),
+    ("Enterprise Value/EBITDA", "enterpriseToEbitda"),
+]
+
+def extract_ratios(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        hist = stock.history(period="5d")
+        if not hist.empty:
+            date_collected = hist.index[-1].strftime("%Y-%m-%d")
+        else:
+            date_collected = "Non disponible"
+        data = {"Ticker": ticker, "Date": date_collected}
+        for display, key in RATIO_FIELDS:
+            val = info.get(key, "Non disponible")
+            if val is None:
+                val = "Non disponible"
+            data[display] = val
+        return data
+    except Exception as e:
+        print(f"Erreur pour {ticker}: {e}")
+        return {"Ticker": ticker, "Date": "Erreur", **{display: "Erreur" for display, _ in RATIO_FIELDS}}
+
+def main():
+    results = []
+    for i, ticker in enumerate(tickers):
+        print(f"{i+1}/{len(tickers)} Extraction pour {ticker}...")
+        data = extract_ratios(ticker)
+        results.append(data)
+        # Pour éviter de se faire bannir par Yahoo, attends un peu
+        time.sleep(0.5)
+    df = pd.DataFrame(results)
+    print(df)
+    df.to_excel("valuation_ratios_sp500_with_dates.xlsx", index=False)
+    print("\nFichier Excel généré : valuation_ratios_sp500_with_dates.xlsx")
+
+if __name__ == "__main__":
+    main()
