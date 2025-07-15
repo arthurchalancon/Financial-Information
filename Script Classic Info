@@ -1,0 +1,35 @@
+import yfinance as yf
+import pandas as pd
+
+COLUMNS = [
+    ("Market Cap", "marketCap"),
+    ("Enterprise Value", "enterpriseValue"),
+    ("Trailing P/E", "trailingPE"),
+    ("Forward P/E", "forwardPE"),
+    ("PEG Ratio (5yr expected)", "pegRatio"),
+    ("Price/Sales", "priceToSalesTrailing12Months"),
+    ("Price/Book", "priceToBook"),
+    ("Enterprise Value/Revenue", "enterpriseToRevenue"),
+    ("Enterprise Value/EBITDA", "enterpriseToEbitda"),
+]
+
+def extract_ratios(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    data = {"Ticker": ticker}
+    for display, key in COLUMNS:
+        data[display] = info.get(key, None)
+    return data
+
+if __name__ == "__main__":
+    # Mets ici la liste des tickers souhaités :
+    tickers = ["AAPL", "MSFT", "GOOGL", "AIR.PA"]   # <-- modifie cette ligne selon tes besoins !
+
+    results = []
+    for ticker in tickers:
+        print(f"Extraction pour {ticker}...")
+        results.append(extract_ratios(ticker))
+
+    df = pd.DataFrame(results)
+    df.to_excel("valuation_ratios.xlsx", index=False)
+    print("Extraction terminée ! Résultats dans valuation_ratios.xlsx")
