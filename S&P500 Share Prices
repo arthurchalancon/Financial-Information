@@ -1,0 +1,33 @@
+import pandas as pd
+import time
+
+# Récupère la liste des tickers du S&P500
+url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+sp500_df = pd.read_html(url)[0]
+tickers = [t.replace('.', '-') for t in sp500_df['Symbol'].tolist()]
+
+all_data = {}
+
+# Télécharge les prix de clôture pour chaque ticker
+for i, ticker in enumerate(tickers):
+    try:
+        print(f"{i+1}/{len(tickers)} : Téléchargement des prix pour {ticker}")
+        hist = yf.Ticker(ticker).history(period="1y")
+        all_data[ticker] = hist['Close']
+        time.sleep(0.5)  # pour ne pas se faire bloquer
+    except Exception as e:
+        print(f"Erreur pour {ticker}: {e}")
+
+# Transforme en DataFrame avec les dates en colonnes, tickers en index (lignes)
+df = pd.DataFrame(all_data)
+
+# Transpose pour avoir :
+# Entreprises en première colonne (index), dates en première ligne (colonnes)
+df = df.transpose()
+
+# Remet un nom propre à la colonne d'index
+df.index.name = "Entreprise"
+
+# Sauvegarde en Excel
+df.to_excel("close_prices_sp500_transposed.xlsx")
+print("✅ Fichier Excel généré : close_prices_sp500_transposed.xlsx")
